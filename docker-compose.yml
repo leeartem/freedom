@@ -104,6 +104,7 @@ services:
         - GID=${GID:-1000}
     container_name: horizon
     command: php artisan horizon
+    restart: unless-stopped
     depends_on:
       - php
     volumes:
