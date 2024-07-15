@@ -9,6 +9,7 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Interfaces\IWalletRepository;
 use App\Interfaces\IWalletTransactionRepository;
 use App\Services\DistributedMutex\Exceptions\AlreadyLockedException;
+use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 
 class WriteOffService
@@ -49,11 +50,13 @@ class WriteOffService
                 throw new InsufficientBalanceException();
             }
 
-            $walletTransaction = $this->walletTransactionRepository->create($dto->toArray());
+            DB::transaction(function () use ($dto, $wallet) {
+                $walletTransaction = $this->walletTransactionRepository->create($dto->toArray());
 
-            if ($walletTransaction->status === WalletTransactionStatus::COMPLETED->value) {
-                $this->walletRepository->decrementBalance($wallet, $walletTransaction->amount);
-            }
+                if ($walletTransaction->status === WalletTransactionStatus::COMPLETED->value) {
+                    $this->walletRepository->decrementBalance($wallet, $walletTransaction->amount);
+                }
+            });
 
             $this->writeOffMutex->release();
         } catch (\Throwable $exception) {

@@ -7,6 +7,7 @@ use App\Enums\WalletTransaction\WalletTransactionStatus;
 use App\Interfaces\IWalletRepository;
 use App\Interfaces\IWalletTransactionRepository;
 use App\Services\DistributedMutex\Exceptions\AlreadyLockedException;
+use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 
 class DepositService
@@ -38,11 +39,13 @@ class DepositService
         }
 
         try {
-            $walletTransaction = $this->walletTransactionRepository->create($dto->toArray());
+            DB::transaction(function () use ($dto) {
+                $walletTransaction = $this->walletTransactionRepository->create($dto->toArray());
 
-            if ($walletTransaction->status === WalletTransactionStatus::COMPLETED->value) {
-                $this->walletRepository->incrementBalance($walletTransaction->user->wallet, $walletTransaction->amount);
-            }
+                if ($walletTransaction->status === WalletTransactionStatus::COMPLETED->value) {
+                    $this->walletRepository->incrementBalance($walletTransaction->user->wallet, $walletTransaction->amount);
+                }
+            });
 
             $this->depositMutex->release();
         } catch (\Throwable $exception) {

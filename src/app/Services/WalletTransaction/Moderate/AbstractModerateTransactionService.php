@@ -8,6 +8,7 @@ use App\Exceptions\UnknownTransactionStatusException;
 use App\Interfaces\IWalletRepository;
 use App\Interfaces\IWalletTransactionRepository;
 use App\Services\DistributedMutex\Exceptions\AlreadyLockedException;
+use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -47,18 +48,20 @@ abstract class AbstractModerateTransactionService
                 return;
             }
 
-            match ($dto->status) {
-                WalletTransactionStatus::BLOCKED->value => $this->blockTransaction($walletTransaction),
-                WalletTransactionStatus::COMPLETED->value => $this->completeTransaction($walletTransaction),
-                WalletTransactionStatus::REJECTED->value => $this->rejectTransaction($walletTransaction),
-                WalletTransactionStatus::FAILED->value,
-                WalletTransactionStatus::REFUNDED->value => null,
-                default => throw new UnknownTransactionStatusException()
-            };
+            DB::transaction(function () use ($dto, $walletTransaction) {
+                match ($dto->status) {
+                    WalletTransactionStatus::BLOCKED->value => $this->blockTransaction($walletTransaction),
+                    WalletTransactionStatus::COMPLETED->value => $this->completeTransaction($walletTransaction),
+                    WalletTransactionStatus::REJECTED->value => $this->rejectTransaction($walletTransaction),
+                    WalletTransactionStatus::FAILED->value,
+                    WalletTransactionStatus::REFUNDED->value => null,
+                    default => throw new UnknownTransactionStatusException()
+                };
 
-            $this->walletTransactionRepository->update($walletTransaction, [
-                'status' => $dto->status,
-            ]);
+                $this->walletTransactionRepository->update($walletTransaction, [
+                    'status' => $dto->status,
+                ]);
+            });
 
             $this->moderateMutex->release();
         } catch (\Throwable $exception) {

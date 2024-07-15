@@ -9,6 +9,7 @@ use App\Exceptions\InsufficientBalanceException;
 use App\Interfaces\IWalletRepository;
 use App\Interfaces\IWalletTransactionRepository;
 use App\Services\DistributedMutex\Exceptions\AlreadyLockedException;
+use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 
 class TransferService
@@ -46,12 +47,14 @@ class TransferService
                 throw new InsufficientBalanceException();
             }
 
-            $walletTransaction = $this->walletTransactionRepository->create($dto->toArray());
+            DB::transaction(function () use ($dto, $initWallet) {
+                $walletTransaction = $this->walletTransactionRepository->create($dto->toArray());
 
-            if ($walletTransaction->status === WalletTransactionStatus::COMPLETED->value) {
-                $this->walletRepository->decrementBalance($initWallet, $walletTransaction->amount);
-                $this->walletRepository->incrementBalance($walletTransaction->user->wallet, $walletTransaction->amount);
-            }
+                if ($walletTransaction->status === WalletTransactionStatus::COMPLETED->value) {
+                    $this->walletRepository->decrementBalance($initWallet, $walletTransaction->amount);
+                    $this->walletRepository->incrementBalance($walletTransaction->user->wallet, $walletTransaction->amount);
+                }
+            });
 
             $this->transferMutex->release();
         } catch (\Throwable $exception) {
