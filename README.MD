@@ -1,4 +1,5 @@
 # Тестовое задание для Freedom Finance
+[Файлик тестового задания (PDF)](./задание.pdf)
 
 Используемые технологии:
  - Laravel 11, PHP 8.2, MariaDB, Redis
@@ -24,7 +25,7 @@ Transfer job
 > docker compose run --rm artisan fire:transfer
 
 Moderate job 
-> docker compose run --rm artisan fire:authorize-transaction 1 deposit blocked
+> docker compose run --rm artisan fire:moderate-transaction 1 deposit blocked
 
 Где 1 - ID транзакции, deposit - тип транзакции, blocked - устанавливаемый статус
 
